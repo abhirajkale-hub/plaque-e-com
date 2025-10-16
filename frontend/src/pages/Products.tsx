@@ -49,14 +49,11 @@ const Products = () => {
     fetchProducts();
   }, []);
 
-  const getBadge = (index: number) => {
-    if (index === 0)
+  const getBadge = (product: Product) => {
+    // Only show "Most Popular" badge for featured products
+    if (product.is_featured) {
       return { text: "Most Popular", variant: "default" as const };
-    if (index === 1)
-      return { text: "Best Value", variant: "secondary" as const };
-    if (index === 2)
-      return { text: "Premium Choice", variant: "outline" as const };
-    if (index === 3) return { text: "Elite Tier", variant: "default" as const };
+    }
     return null;
   };
 
@@ -103,7 +100,7 @@ const Products = () => {
               {/* Products Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
                 {products?.map((product, index) => {
-                  const badge = getBadge(index);
+                  const badge = getBadge(product);
                   const minPrice = Math.min(
                     ...product.product_variants.map((v) => v.price)
                   );

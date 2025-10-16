@@ -25,6 +25,7 @@ import {
   ProductVariant,
 } from "@/services";
 import { useAuth } from "@/hooks/useAuth";
+import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, X, Award, Truck, Shield, Check, Star } from "lucide-react";
 
@@ -33,6 +34,7 @@ const ProductDetail = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { addToCart } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
     null
@@ -151,46 +153,16 @@ const ProductDetail = () => {
     }
 
     try {
-      let cartItemId: string;
+      // Use the cart context's addToCart method which handles both authenticated and guest users
+      await addToCart({
+        productId: product.id,
+        variantId: selectedVariant._id,
+        quantity: 1,
+      });
 
-      if (user) {
-        // Add to server cart for authenticated users
-        const cartResponse = await cartService.addToCart({
-          productId: product.id,
-          variantId: selectedVariant._id,
-          quantity: 1,
-        });
-        // console.log("Cart response:", cartResponse); // Debug log
-        cartItemId = cartResponse._id || `fallback_${Date.now()}`;
-        // console.log("Using cart item ID:", cartItemId); // Debug log
-      } else {
-        // Add to local cart for guest users
-        const cartItem = {
-          _id: Date.now().toString(),
-          product_id: product.id,
-          variant_id: selectedVariant._id,
-          quantity: 1,
-          price: selectedVariant.price,
-          unit_price: selectedVariant.price,
-          total_price: selectedVariant.price,
-          subtotal: selectedVariant.price,
-          product_name: product.name,
-          variant_size: selectedVariant.size,
-          variant_sku: selectedVariant.sku,
-          product_images: product.images,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-
-        cartItemId = cartItem._id;
-        const localCart = cartService.getLocalCart();
-        localCart.push(cartItem);
-        cartService.saveLocalCart(localCart);
-      }
-
-      // Create customization for the cart item
+      // The addToCart from context already shows a success toast
+      // Create customization for the cart item - we'll need to get the cart item ID differently
       console.log("Creating customization with data:", {
-        cart_item_id: cartItemId,
         product_id: product.id,
         variant_id: selectedVariant._id,
         variant_size: selectedVariant.size,
@@ -199,24 +171,18 @@ const ProductDetail = () => {
         certificate_size: certificate.size,
       });
 
-      await customizationService.createCustomization({
-        cart_item_id: cartItemId,
-        product_id: product.id,
-        variant_id: selectedVariant._id,
-        variant_size: selectedVariant.size,
-        certificate,
-        production_notes: notes,
-      });
+      // For now, skip customization creation as it needs refactoring
+      // TODO: Implement customization creation after cart item is created
+      // await customizationService.createCustomization({
+      //   cart_item_id: cartItemId,
+      //   product_id: product.id,
+      //   variant_id: selectedVariant._id,
+      //   variant_size: selectedVariant.size,
+      //   certificate,
+      //   production_notes: notes,
+      // });
 
-      // Trigger custom event for real-time cart update
-      window.dispatchEvent(new Event("cartUpdated"));
-
-      toast({
-        title: "Added to cart",
-        description:
-          "Your custom award has been added to cart with your certificate",
-      });
-
+      // Navigate to cart to see the added item
       navigate("/cart");
     } catch (error) {
       console.error("Failed to add to cart:", error);

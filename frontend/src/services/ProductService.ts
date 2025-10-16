@@ -50,6 +50,7 @@ export interface Product {
   description: string;
   material: string;
   is_active: boolean;
+  is_featured?: boolean;
   meta_title?: string;
   meta_description?: string;
   meta_keywords?: string[];
@@ -369,6 +370,57 @@ class ProductService {
       }
     } catch (error) {
       handleApiError(error, "Failed to delete image");
+      throw error;
+    }
+  }
+
+  async setFeaturedProduct(productId: string): Promise<void> {
+    try {
+      const response = await apiClient.patch(
+        `/products/admin/${productId}/featured`
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.error?.message || "Failed to set featured product"
+        );
+      }
+    } catch (error) {
+      handleApiError(error, "Failed to set featured product");
+      throw error;
+    }
+  }
+
+  async removeFeaturedProduct(productId: string): Promise<void> {
+    try {
+      const response = await apiClient.delete(
+        `/products/admin/${productId}/featured`
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.error?.message || "Failed to remove featured product"
+        );
+      }
+    } catch (error) {
+      handleApiError(error, "Failed to remove featured product");
+      throw error;
+    }
+  }
+
+  async getFeaturedProduct(): Promise<Product | null> {
+    try {
+      const response = await apiClient.get<Product>("/products/featured");
+
+      if (response.success) {
+        return response.data || null;
+      }
+
+      throw new Error(
+        response.error?.message || "Failed to get featured product"
+      );
+    } catch (error) {
+      handleApiError(error, "Failed to get featured product");
       throw error;
     }
   }

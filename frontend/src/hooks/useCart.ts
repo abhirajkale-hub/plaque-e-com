@@ -86,11 +86,17 @@ export function useCart(): UseCartReturn {
     try {
       console.log("useCart: Adding item to cart:", data);
 
+      // Optimistically update cart count immediately
+      setCartCount((prev) => prev + (data.quantity || 1));
+
       // Always try API first (handles both authenticated users and guest sessions)
       try {
         await cartService.addToCart(data);
         console.log("useCart: Add to cart API call successful");
       } catch (apiError) {
+        // Revert optimistic update on error
+        setCartCount((prev) => prev - (data.quantity || 1));
+
         // If API fails, fall back to local cart for truly offline scenarios
         console.warn(
           "API add failed, falling back to local storage:",
@@ -115,7 +121,7 @@ export function useCart(): UseCartReturn {
 
       await refreshCart();
 
-      // Trigger cart update event for navbar
+      // Trigger cart update event for navbar and other components
       window.dispatchEvent(new CustomEvent("cartUpdated"));
 
       toast({
@@ -154,7 +160,7 @@ export function useCart(): UseCartReturn {
 
       await refreshCart();
 
-      // Trigger cart update event for navbar
+      // Trigger cart update event for navbar and other components
       window.dispatchEvent(new CustomEvent("cartUpdated"));
 
       toast({
@@ -194,7 +200,7 @@ export function useCart(): UseCartReturn {
 
       await refreshCart();
 
-      // Trigger cart update event for navbar
+      // Trigger cart update event for navbar and other components
       window.dispatchEvent(new CustomEvent("cartUpdated"));
     } catch (error) {
       console.error("Failed to update cart item:", error);
@@ -208,6 +214,10 @@ export function useCart(): UseCartReturn {
 
   const clearCart = async () => {
     try {
+      // Optimistically clear cart state immediately
+      setCart(null);
+      setCartCount(0);
+
       // Always try API first (handles both authenticated users and guest sessions)
       try {
         await cartService.clearCart();
@@ -222,7 +232,7 @@ export function useCart(): UseCartReturn {
 
       await refreshCart();
 
-      // Trigger cart update event for navbar
+      // Trigger cart update event for navbar and other components
       window.dispatchEvent(new CustomEvent("cartUpdated"));
 
       toast({

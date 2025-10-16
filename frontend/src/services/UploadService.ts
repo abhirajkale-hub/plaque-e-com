@@ -9,15 +9,33 @@ export interface UploadResponse {
 
 export interface GalleryUpload {
   id: string;
-  image_url: string;
-  caption?: string;
-  is_approved: boolean;
-  is_featured: boolean;
-  created_at: string;
-  user_id?: string;
+  title: string;
+  description?: string;
+  imageUrl: string;
+  customerName: string;
+  customerRole: string;
+  isLocalUpload: boolean;
+  createdAt: string;
 }
 
 class UploadService {
+  private readonly MAX_IMAGE_SIZE_MB = 5;
+  private readonly MAX_CERTIFICATE_SIZE_MB = 25;
+  private readonly MAX_IMAGES_PER_UPLOAD = 10;
+
+  private readonly IMAGE_TYPES = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+  ];
+
+  private readonly CERTIFICATE_TYPES = [
+    "application/pdf",
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+  ];
   // Generic file upload
   async uploadFile(
     file: File,
@@ -130,20 +148,32 @@ class UploadService {
     }
   }
 
-  // Gallery uploads for customer showcase
+  // Gallery management
   async uploadGalleryImage(
     image: File,
-    caption?: string
+    title: string,
+    description?: string,
+    customerName?: string,
+    customerRole?: string
   ): Promise<GalleryUpload> {
     try {
       const formData = new FormData();
       formData.append("image", image);
-      if (caption) {
-        formData.append("caption", caption);
+      formData.append("title", title);
+
+      // Only append optional fields if they have values
+      if (description && description.trim()) {
+        formData.append("description", description.trim());
+      }
+      if (customerName && customerName.trim()) {
+        formData.append("customerName", customerName.trim());
+      }
+      if (customerRole && customerRole.trim()) {
+        formData.append("customerRole", customerRole.trim());
       }
 
       const response = await apiClient.upload<GalleryUpload>(
-        "/gallery/upload",
+        "/admin/gallery/upload",
         formData
       );
 
@@ -160,39 +190,9 @@ class UploadService {
     }
   }
 
-  // Get gallery images
-  async getGalleryImages(filters?: {
-    approved?: boolean;
-    featured?: boolean;
-    user_id?: string;
-    page?: number;
-    limit?: number;
-  }): Promise<{
-    images: GalleryUpload[];
-    total: number;
-    page: number;
-    totalPages: number;
-  }> {
+  async getGalleryImages(): Promise<GalleryUpload[]> {
     try {
-      const params = new URLSearchParams();
-
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            params.append(key, value.toString());
-          }
-        });
-      }
-
-      const queryString = params.toString();
-      const endpoint = queryString ? `/gallery?${queryString}` : "/gallery";
-
-      const response = await apiClient.get<{
-        images: GalleryUpload[];
-        total: number;
-        page: number;
-        totalPages: number;
-      }>(endpoint);
+      const response = await apiClient.get<GalleryUpload[]>("/gallery");
 
       if (response.success && response.data) {
         return response.data;
@@ -203,6 +203,115 @@ class UploadService {
       );
     } catch (error) {
       handleApiError(error, "Failed to fetch gallery images");
+      throw error;
+    }
+  }
+
+  async getAdminGalleryImages(): Promise<GalleryUpload[]> {
+    try {
+      const response = await apiClient.get<GalleryUpload[]>("/admin/gallery");
+
+      if (response.success && response.data) {
+        return response.data;
+      }
+
+      throw new Error(
+        response.error?.message || "Failed to fetch gallery images"
+      );
+    } catch (error) {
+      handleApiError(error, "Failed to fetch gallery images");
+      throw error;
+    }
+  }
+
+  async addGalleryImageFromUrl(
+    imageUrl: string,
+    title: string,
+    description?: string,
+    customerName?: string,
+    customerRole?: string
+  ): Promise<GalleryUpload> {
+    try {
+      const response = await apiClient.post<GalleryUpload>(
+        "/admin/gallery/url",
+        {
+          imageUrl,
+          title,
+          description,
+          customerName,
+          customerRole,
+        }
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      }
+
+      throw new Error(response.error?.message || "Failed to add gallery image");
+    } catch (error) {
+      handleApiError(error, "Failed to add gallery image");
+      throw error;
+    }
+  }
+
+  async deleteGalleryImage(id: string): Promise<void> {
+    try {
+      const response = await apiClient.delete(`/admin/gallery/${id}`);
+
+      if (!response.success) {
+        throw new Error(
+          response.error?.message || "Failed to delete gallery image"
+        );
+      }
+    } catch (error) {
+      handleApiError(error, "Failed to delete gallery image");
+      throw error;
+    }
+  }
+
+  async updateGalleryImage(
+    id: string,
+    updates: {
+      title?: string;
+      description?: string;
+      customerName?: string;
+      customerRole?: string;
+      isActive?: boolean;
+      sortOrder?: number;
+    }
+  ): Promise<GalleryUpload> {
+    try {
+      const response = await apiClient.put<GalleryUpload>(
+        `/admin/gallery/${id}`,
+        updates
+      );
+
+      if (response.success && response.data) {
+        return response.data;
+      }
+
+      throw new Error(
+        response.error?.message || "Failed to update gallery image"
+      );
+    } catch (error) {
+      handleApiError(error, "Failed to update gallery image");
+      throw error;
+    }
+  }
+
+  async reorderGalleryImages(imageIds: string[]): Promise<void> {
+    try {
+      const response = await apiClient.put("/gallery/admin/reorder", {
+        imageIds,
+      });
+
+      if (!response.success) {
+        throw new Error(
+          response.error?.message || "Failed to reorder gallery images"
+        );
+      }
+    } catch (error) {
+      handleApiError(error, "Failed to reorder gallery images");
       throw error;
     }
   }
@@ -260,18 +369,6 @@ class UploadService {
     return file.type === "application/pdf";
   }
 
-  // File validation configs
-  readonly IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-  readonly CERTIFICATE_TYPES = [
-    "application/pdf",
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-  ];
-  readonly MAX_IMAGE_SIZE_MB = 5; // 5MB
-  readonly MAX_CERTIFICATE_SIZE_MB = 10; // 10MB
-  readonly MAX_IMAGES_PER_UPLOAD = 10;
-
   // Validate product images
   validateProductImages(files: FileList): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
@@ -300,16 +397,16 @@ class UploadService {
     };
   }
 
-  // Validate certificate
-  validateCertificate(file: File): { valid: boolean; errors: string[] } {
+  // Validate gallery image
+  validateGalleryImage(file: File): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
-    if (!this.validateFileType(file, this.CERTIFICATE_TYPES)) {
-      errors.push("Invalid file type. Allowed: PDF, JPEG, PNG");
+    if (!this.validateFileType(file, this.IMAGE_TYPES)) {
+      errors.push("Invalid image type. Allowed: JPEG, PNG, WebP");
     }
 
-    if (!this.validateFileSize(file, this.MAX_CERTIFICATE_SIZE_MB)) {
-      errors.push(`File size exceeds ${this.MAX_CERTIFICATE_SIZE_MB}MB`);
+    if (!this.validateFileSize(file, this.MAX_IMAGE_SIZE_MB)) {
+      errors.push(`File size exceeds ${this.MAX_IMAGE_SIZE_MB}MB`);
     }
 
     return {

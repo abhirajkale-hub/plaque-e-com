@@ -21,15 +21,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// Type for handling nested user structure from AuthContext
-type NestedUserType = {
-  user?: {
-    full_name?: string;
-    email?: string;
-  };
+// Type for handling different user structures from different services
+type UserWithFullName = {
   full_name?: string;
   email?: string;
 };
+
+type UserWithFirstLastName = {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+};
+
+type NestedUserType = {
+  user?: UserWithFullName | UserWithFirstLastName;
+} & (UserWithFullName | UserWithFirstLastName);
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -55,10 +61,23 @@ export const Navbar = () => {
     // Type assertion to handle the nested structure temporarily
     const userData = (user as NestedUserType)?.user || user;
 
-    // Try to get first name from full_name
-    if (userData.full_name && userData.full_name.trim()) {
+    // Check if userData has full_name (UserService.User structure)
+    if (
+      "full_name" in userData &&
+      userData.full_name &&
+      userData.full_name.trim()
+    ) {
       const firstName = userData.full_name.trim().split(" ")[0];
       if (firstName) return firstName;
+    }
+
+    // Check if userData has first_name (AuthService.User structure)
+    if (
+      "first_name" in userData &&
+      userData.first_name &&
+      userData.first_name.trim()
+    ) {
+      return userData.first_name.trim();
     }
 
     // Fallback to email prefix
@@ -72,12 +91,15 @@ export const Navbar = () => {
   };
 
   // Debug: Check what's being displayed
+  // const userData = (user as NestedUserType)?.user || user;
   // console.log("Navbar Debug:", {
   //   user: user,
   //   displayName: getDisplayName(),
   //   userExists: !!user,
-  //   fullName: (user as NestedUserType)?.user?.full_name || user?.full_name,
-  //   email: (user as NestedUserType)?.user?.email || user?.email,
+  //   fullName: 'full_name' in (userData || {}) ? userData.full_name : undefined,
+  //   firstName: 'first_name' in (userData || {}) ? userData.first_name : undefined,
+  //   lastName: 'last_name' in (userData || {}) ? userData.last_name : undefined,
+  //   email: userData?.email,
   // });
 
   const handleSignOut = async () => {

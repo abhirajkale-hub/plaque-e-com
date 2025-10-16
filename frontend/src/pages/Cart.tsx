@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -9,9 +10,28 @@ import { toast } from "@/hooks/use-toast";
 import { Trash2, Loader2, ShoppingCart } from "lucide-react";
 
 const Cart = () => {
-  const { cart, loading, removeFromCart } = useCart();
+  const { cart, loading, removeFromCart, refreshCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Refresh cart when component mounts
+  useEffect(() => {
+    console.log("Cart component mounted - refreshing cart data");
+    refreshCart();
+  }, [refreshCart]);
+
+  // Listen for cart update events
+  useEffect(() => {
+    const handleCartUpdated = () => {
+      console.log("Cart updated event received - refreshing cart data");
+      refreshCart();
+    };
+
+    window.addEventListener("cartUpdated", handleCartUpdated);
+    return () => {
+      window.removeEventListener("cartUpdated", handleCartUpdated);
+    };
+  }, [refreshCart]);
 
   const handleRemoveItem = async (itemId: string) => {
     await removeFromCart(itemId);

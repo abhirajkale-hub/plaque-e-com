@@ -16,29 +16,33 @@ interface ReviewVideo {
 // Helper function to convert YouTube URL to embed format
 const convertToEmbedUrl = (url: string): string => {
   // If already an embed URL, return as is
-  if (url.includes('/embed/')) {
+  if (url.includes("/embed/")) {
     // Remove autoplay parameters for manual control
-    return url.split('?')[0];
+    return url.split("?")[0];
   }
-  
+
   // Extract video ID from various YouTube URL formats
-  let videoId = '';
-  
+  let videoId = "";
+
   // Format: https://www.youtube.com/watch?v=VIDEO_ID
-  if (url.includes('youtube.com/watch?v=')) {
-    videoId = url.split('v=')[1]?.split('&')[0] || '';
+  if (url.includes("youtube.com/watch?v=")) {
+    videoId = url.split("v=")[1]?.split("&")[0] || "";
   }
   // Format: https://youtu.be/VIDEO_ID
-  else if (url.includes('youtu.be/')) {
-    videoId = url.split('youtu.be/')[1]?.split('?')[0] || '';
+  else if (url.includes("youtu.be/")) {
+    videoId = url.split("youtu.be/")[1]?.split("?")[0] || "";
   }
-  
+
   return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
 };
 
 // Separate component for each review card to properly manage hooks
-const ReviewCard = ({ review, index, onVideoInteraction }: { 
-  review: ReviewVideo; 
+const ReviewCard = ({
+  review,
+  index,
+  onVideoInteraction,
+}: {
+  review: ReviewVideo;
   index: number;
   onVideoInteraction: (isInteracting: boolean) => void;
 }) => {
@@ -64,7 +68,8 @@ const ReviewCard = ({ review, index, onVideoInteraction }: {
       onMouseLeave={handleMouseLeave}
     >
       <div className="aspect-[9/16] relative overflow-hidden bg-black">
-        {isHovered ? (
+        {/* COMMENTED OUT: Auto-play YouTube video functionality */}
+        {/* {isHovered ? (
           <iframe
             ref={iframeRef}
             src={`${convertToEmbedUrl(review.videoUrl)}?autoplay=1&mute=0`}
@@ -72,22 +77,28 @@ const ReviewCard = ({ review, index, onVideoInteraction }: {
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
-        ) : (
-          <img
-            src={review.thumbnail}
-            alt={displayName}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.currentTarget.src = 'https://placehold.co/360x640?text=Video+Preview';
-            }}
-          />
-        )}
+        ) : ( */}
+        <img
+          src={review.thumbnail}
+          alt={displayName}
+          className={`w-full h-full object-cover transition-all duration-300 ${
+            isHovered ? "scale-110 brightness-110" : ""
+          }`}
+          onError={(e) => {
+            e.currentTarget.src =
+              "https://placehold.co/360x640?text=Video+Preview";
+          }}
+        />
+        {/* )} */}
       </div>
 
       <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
         <div className="flex gap-1">
           {[...Array(review.rating)].map((_, i) => (
-            <Star key={i} className="w-3 sm:w-4 h-3 sm:h-4 fill-primary text-primary" />
+            <Star
+              key={i}
+              className="w-3 sm:w-4 h-3 sm:h-4 fill-primary text-primary"
+            />
           ))}
         </div>
 
@@ -113,9 +124,11 @@ const defaultReviews: ReviewVideo[] = [
     role: "Funded Trader",
     firm: "FTMO",
     rating: 5,
-    thumbnail: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&h=600&fit=crop",
-    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&loop=1&playlist=dQw4w9WgXcQ",
-    text: "Best trading award in India! The quality is premium and delivery was super fast."
+    thumbnail:
+      "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&h=600&fit=crop",
+    videoUrl:
+      "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&loop=1&playlist=dQw4w9WgXcQ",
+    text: "Best trading award in India! The quality is premium and delivery was super fast.",
   },
   {
     id: "2",
@@ -123,9 +136,11 @@ const defaultReviews: ReviewVideo[] = [
     role: "Prop Trader",
     firm: "MyFundedFX",
     rating: 5,
-    thumbnail: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=600&fit=crop",
-    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&loop=1&playlist=dQw4w9WgXcQ",
-    text: "The acrylic quality is amazing! Love the premium stand."
+    thumbnail:
+      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=600&fit=crop",
+    videoUrl:
+      "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&loop=1&playlist=dQw4w9WgXcQ",
+    text: "The acrylic quality is amazing! Love the premium stand.",
   },
   {
     id: "3",
@@ -133,10 +148,12 @@ const defaultReviews: ReviewVideo[] = [
     role: "Challenge Winner",
     firm: "The5ers",
     rating: 5,
-    thumbnail: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=600&fit=crop",
-    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&loop=1&playlist=dQw4w9WgXcQ",
-    text: "Perfect way to celebrate my first payout! Highly recommended."
-  }
+    thumbnail:
+      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=600&fit=crop",
+    videoUrl:
+      "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&loop=1&playlist=dQw4w9WgXcQ",
+    text: "Perfect way to celebrate my first payout! Highly recommended.",
+  },
 ];
 
 export const Reviews = () => {
@@ -149,7 +166,7 @@ export const Reviews = () => {
   useEffect(() => {
     // Load from localStorage if available
     const loadReviews = () => {
-      const stored = localStorage.getItem('reviewVideos');
+      const stored = localStorage.getItem("reviewVideos");
       if (stored) {
         setReviews(JSON.parse(stored));
       }
@@ -162,10 +179,10 @@ export const Reviews = () => {
       loadReviews();
     };
 
-    window.addEventListener('reviewsUpdated', handleReviewsUpdate);
+    window.addEventListener("reviewsUpdated", handleReviewsUpdate);
 
     return () => {
-      window.removeEventListener('reviewsUpdated', handleReviewsUpdate);
+      window.removeEventListener("reviewsUpdated", handleReviewsUpdate);
     };
   }, []);
 
@@ -175,9 +192,9 @@ export const Reviews = () => {
     };
 
     checkMobile();
-    window.addEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
 
-    return () => window.removeEventListener('resize', checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   useEffect(() => {
@@ -193,12 +210,12 @@ export const Reviews = () => {
   const getVisibleReviews = () => {
     const count = isMobile ? 1 : 4;
     const visible = [];
-    
+
     for (let i = 0; i < count; i++) {
       const index = (currentIndex + i) % reviews.length;
       visible.push(reviews[index]);
     }
-    
+
     return visible;
   };
 
@@ -215,7 +232,10 @@ export const Reviews = () => {
   const visibleReviews = getVisibleReviews();
 
   return (
-    <section id="reviews" className="py-16 sm:py-24 md:py-32 relative overflow-hidden">
+    <section
+      id="reviews"
+      className="py-16 sm:py-24 md:py-32 relative overflow-hidden"
+    >
       <div className="absolute inset-0 opacity-30">
         <div className="absolute top-0 right-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-secondary/20 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-primary/20 rounded-full blur-3xl" />
@@ -236,9 +256,9 @@ export const Reviews = () => {
         <div className="relative max-w-7xl mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
             {visibleReviews.map((review, index) => (
-              <ReviewCard 
-                key={`${review.id}-${index}`} 
-                review={review} 
+              <ReviewCard
+                key={`${review.id}-${index}`}
+                review={review}
                 index={index}
                 onVideoInteraction={setIsUserInteracting}
               />
@@ -285,7 +305,10 @@ export const Reviews = () => {
             <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full glass-card">
               <div className="flex">
                 {[1, 2, 3, 4, 5].map((star) => (
-                  <Star key={star} className="w-5 h-5 fill-primary text-primary" />
+                  <Star
+                    key={star}
+                    className="w-5 h-5 fill-primary text-primary"
+                  />
                 ))}
               </div>
               <span className="text-lg font-bold">4.9/5</span>

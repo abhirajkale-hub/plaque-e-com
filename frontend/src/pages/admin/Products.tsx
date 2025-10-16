@@ -275,6 +275,43 @@ const AdminProducts = () => {
     }
   };
 
+  const toggleFeatured = async (id: string, isFeatured: boolean) => {
+    try {
+      setLoading(true);
+
+      if (isFeatured) {
+        // Remove featured status
+        await productService.removeFeaturedProduct(id);
+      } else {
+        // Set as featured
+        await productService.setFeaturedProduct(id);
+      }
+
+      // Refresh the products list to reflect changes
+      const updatedProducts = await productService.getAllProducts();
+      setProducts(updatedProducts);
+
+      toast({
+        title: "Success",
+        description: `Product ${
+          isFeatured ? "removed from featured" : "set as featured"
+        } successfully`,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update featured status";
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddVariant = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1298,6 +1335,9 @@ const AdminProducts = () => {
                   ) : (
                     <Badge variant="secondary">Inactive</Badge>
                   )}
+                  {product.is_featured && (
+                    <Badge variant="destructive">Most Popular</Badge>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground">/{product.slug}</p>
                 {product.description && (
@@ -1314,12 +1354,27 @@ const AdminProducts = () => {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Switch
-                  checked={product.is_active}
-                  onCheckedChange={() =>
-                    toggleActive(product.id, product.is_active)
-                  }
-                />
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">Active</span>
+                  <Switch
+                    checked={product.is_active}
+                    onCheckedChange={() =>
+                      toggleActive(product.id, product.is_active)
+                    }
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">
+                    Featured
+                  </span>
+                  <Switch
+                    checked={product.is_featured || false}
+                    onCheckedChange={() =>
+                      toggleFeatured(product.id, product.is_featured || false)
+                    }
+                    disabled={!product.is_active}
+                  />
+                </div>
                 <Button
                   size="sm"
                   variant="outline"

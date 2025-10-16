@@ -9,21 +9,26 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useCart } from "@/contexts/CartContext";
 import {
   orderService,
   paymentService,
-  cartService,
   userService,
   shiprocketService,
   type CartItem,
   type UserAddress,
 } from "@/services";
+import {
+  couponService,
+  type CouponValidationResult,
+} from "@/services/CouponService";
 import { CreditCard, Truck, Loader2, MapPin, Plus } from "lucide-react";
 
 const Checkout = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { cart, clearCart } = useCart();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
@@ -33,6 +38,15 @@ const Checkout = () => {
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [validatedCoupon, setValidatedCoupon] =
+    useState<CouponValidationResult | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     full_name: "",
@@ -54,20 +68,22 @@ const Checkout = () => {
 
       try {
         setLoading(true);
-        const [cart, userAddresses] = await Promise.all([
-          cartService.getCart(),
-          userService.getUserAddresses().catch((error) => {
-            console.warn("Failed to load user addresses:", error);
-            return []; // Return empty array on error
-          }),
-        ]);
 
-        if (cart.items.length === 0) {
+        // Use cart from context instead of fetching again
+        if (!cart || cart.items.length === 0) {
           navigate("/cart");
           return;
         }
 
-        // console.log("Checkout Debug - Raw cart from service:", cart);
+        // Get user addresses
+        const userAddresses = await userService
+          .getUserAddresses()
+          .catch((error) => {
+            console.warn("Failed to load user addresses:", error);
+            return []; // Return empty array on error
+          });
+
+        // console.log("Checkout Debug - Raw cart from context:", cart);
         // console.log("Checkout Debug - Cart items structure:", cart.items);
         // console.log("Checkout Debug - First cart item:", cart.items[0]);
 
@@ -115,9 +131,91 @@ const Checkout = () => {
     };
 
     loadCartAndUserData();
-  }, [navigate, user, toast]);
+  }, [navigate, user, toast, cart]);
 
-  const total = cartItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+  // Fetch available active coupons for hints
+  useEffect(() => {
+    const fetchAvailableCoupons = async () => {
+      try {
+        // For now, we'll show some default active coupons
+        // In a production environment, you might want to create a public endpoint
+        // to fetch active coupon codes for display purposes
+        const defaultCoupons = ["MTA"];
+
+        // You could optionally try to fetch from admin endpoint if user is logged in
+        // but for customer experience, we'll keep it simple with known active codes
+        setAvailableCoupons(defaultCoupons);
+      } catch (error) {
+        console.warn("Failed to fetch available coupons:", error);
+        // Set some default coupon hints
+        setAvailableCoupons(["MTA"]);
+      }
+    };
+
+    fetchAvailableCoupons();
+  }, []);
+
+  const subtotal = cartItems.reduce(
+    (sum, item) => sum + (item.subtotal || 0),
+    0
+  );
+  // Use actual coupon discount amount instead of hardcoded 10%
+  const discountAmount = couponApplied && validatedCoupon ? couponDiscount : 0;
+  const total = subtotal - discountAmount;
+
+  // Coupon functions
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast({
+        title: "Invalid Input",
+        description: "Please enter a coupon code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setCouponLoading(true);
+      const validationResult = await couponService.validateCoupon(
+        couponCode.trim(),
+        subtotal
+      );
+
+      setValidatedCoupon(validationResult);
+      setCouponApplied(true);
+      setCouponDiscount(validationResult.discount_amount);
+
+      toast({
+        title: "Coupon Applied!",
+        description: `You've saved ₹${validationResult.discount_amount} on your order!`,
+      });
+    } catch (error) {
+      console.error("Coupon validation failed:", error);
+      const errorMessage =
+        error instanceof Error && "response" in error
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message
+          : "Invalid or expired coupon code";
+      toast({
+        title: "Invalid Coupon",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponApplied(false);
+    setCouponDiscount(0);
+    setCouponCode("");
+    setValidatedCoupon(null);
+    toast({
+      title: "Coupon Removed",
+      description: "The discount has been removed from your order.",
+    });
+  };
 
   const handleAddressSelect = (addressId: string) => {
     const address = addresses.find((addr) => addr._id === addressId);
@@ -303,10 +401,29 @@ const Checkout = () => {
           quantity: item.quantity,
           price: item.price,
         })),
-        totalAmount: cartItems.reduce(
-          (total, item) => total + item.price * item.quantity,
-          0
-        ),
+        totalAmount:
+          couponApplied && validatedCoupon
+            ? cartItems.reduce(
+                (total, item) => total + item.price * item.quantity,
+                0
+              ) - couponDiscount
+            : cartItems.reduce(
+                (total, item) => total + item.price * item.quantity,
+                0
+              ), // Send final amount (after discount if applied)
+        couponInfo:
+          couponApplied && validatedCoupon
+            ? {
+                couponId: validatedCoupon.coupon.id,
+                couponCode: validatedCoupon.coupon.code,
+                discountAmount: couponDiscount,
+                finalAmount:
+                  cartItems.reduce(
+                    (total, item) => total + item.price * item.quantity,
+                    0
+                  ) - couponDiscount,
+              }
+            : null,
         shippingDetails: {
           full_name: formData.full_name,
           phone: formData.phone,
@@ -351,15 +468,37 @@ const Checkout = () => {
       // Create order
       const order = await orderService.createOrder(orderData);
 
+      // Apply coupon if one was used
+      if (couponApplied && validatedCoupon) {
+        try {
+          await couponService.applyCoupon(
+            validatedCoupon.coupon.id,
+            order.id,
+            subtotal,
+            couponDiscount
+          );
+          console.log("Coupon applied successfully to order:", order.id);
+        } catch (couponError) {
+          console.error("Failed to apply coupon to order:", couponError);
+          // Don't fail the entire checkout if coupon application fails
+          toast({
+            title: "Warning",
+            description:
+              "Order created but coupon application failed. Contact support if discount wasn't applied.",
+            variant: "destructive",
+          });
+        }
+      }
+
       // console.log('Checkout Debug - Order created:', order);
       // console.log('Checkout Debug - Order ID:', order.id);
       // console.log('Checkout Debug - Order total_amount:', order.total_amount);
       // console.log('Checkout Debug - Order order_number:', order.order_number);
 
-      // Initialize payment
+      // Initialize payment with discounted amount
       const paymentOrder = await paymentService.createPaymentOrder({
         orderId: order.id,
-        amount: order.total_amount,
+        amount: total, // Use discounted total
         currency: "INR",
         customerInfo: {
           name: formData.full_name,
@@ -463,8 +602,8 @@ const Checkout = () => {
               }
             }
 
-            // Clear cart
-            await cartService.clearCart();
+            // Clear cart using context
+            await clearCart();
 
             navigate("/my-orders");
           } catch (error) {
@@ -782,8 +921,98 @@ const Checkout = () => {
                     ))}
                   </div>
 
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between items-center">
+                  {/* Coupon Section */}
+                  <div className="border-t pt-4 space-y-3">
+                    {!couponApplied ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="coupon">Have a coupon code?</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="coupon"
+                            placeholder="Enter coupon code"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            variant="outline"
+                            onClick={handleApplyCoupon}
+                            disabled={!couponCode.trim() || couponLoading}
+                          >
+                            {couponLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Validating...
+                              </>
+                            ) : (
+                              "Apply"
+                            )}
+                          </Button>
+                        </div>
+                        {/* Coupon Hints */}
+                        {availableCoupons.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs text-muted-foreground mb-1">
+                              Try these codes:
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {availableCoupons.map((code) => (
+                                <button
+                                  key={code}
+                                  type="button"
+                                  onClick={() => setCouponCode(code)}
+                                  className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded border border-blue-200 hover:bg-blue-100 transition-colors"
+                                >
+                                  {code}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div>
+                          <p className="font-medium text-green-800">
+                            {validatedCoupon?.coupon.code} Applied
+                          </p>
+                          <p className="text-sm text-green-600">
+                            {validatedCoupon?.coupon.discount_type ===
+                            "percentage"
+                              ? `${validatedCoupon.coupon.discount_value}% discount`
+                              : `₹${validatedCoupon?.coupon.discount_value} discount`}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleRemoveCoupon}
+                          className="text-green-700 hover:text-green-800"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t pt-4 space-y-2">
+                    <div className="flex justify-between">
+                      <p>Subtotal</p>
+                      <p>₹{subtotal.toLocaleString()}</p>
+                    </div>
+                    {couponApplied && validatedCoupon && (
+                      <div className="flex justify-between text-green-600">
+                        <p>
+                          Discount ({validatedCoupon.coupon.code} -{" "}
+                          {validatedCoupon.coupon.discount_type === "percentage"
+                            ? `${validatedCoupon.coupon.discount_value}%`
+                            : `₹${validatedCoupon.coupon.discount_value}`}
+                          )
+                        </p>
+                        <p>-₹{discountAmount.toLocaleString()}</p>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center border-t pt-2">
                       <p className="text-lg font-semibold">Total</p>
                       <p className="text-lg font-bold">
                         ₹{total.toLocaleString()}
