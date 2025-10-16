@@ -236,6 +236,13 @@ const productSchema = new mongoose.Schema({
         index: true
     },
 
+    // Featured product flag - only one product can be featured at a time
+    is_featured: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
+
     // Soft delete support
     deleted_at: {
         type: Date,
@@ -334,6 +341,19 @@ productSchema.pre('save', function (next) {
         }
     }
 
+    next();
+});
+
+// Pre-save middleware to ensure only one product can be featured
+productSchema.pre('save', async function (next) {
+    // If this product is being set as featured
+    if (this.isModified('is_featured') && this.is_featured) {
+        // Remove featured status from all other products
+        await this.constructor.updateMany(
+            { _id: { $ne: this._id }, is_featured: true },
+            { $set: { is_featured: false } }
+        );
+    }
     next();
 });
 

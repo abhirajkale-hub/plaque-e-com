@@ -520,10 +520,11 @@ const clearCart = async (req, res) => {
             return res.status(404).json(errorResponse('Cart not found'));
         }
 
-        const itemCount = cart.totalItems;
+        const itemCount = cart.total_items;
 
         // Clear cart
-        await cart.clearCart();
+        cart.clearCart();
+        await cart.save();
 
         logger.info('Cart cleared successfully', {
             userId,
@@ -533,11 +534,14 @@ const clearCart = async (req, res) => {
 
         const response = {
             cart: {
-                id: cart._id,
+                _id: cart._id,
+                user_id: cart.user_id,
                 items: [],
-                totalAmount: 0,
-                totalItems: 0,
-                lastUpdated: cart.lastUpdated
+                total_amount: 0,
+                total_items: 0,
+                created_at: cart.created_at,
+                updated_at: cart.updated_at,
+                last_updated: cart.last_updated
             }
         };
 

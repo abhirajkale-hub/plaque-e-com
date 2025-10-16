@@ -10,7 +10,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const connectDB = require('./config/database');
 
 // Import middleware
-const { errorHandler, notFound } = require('./middleware/errorHandler');
+const { errorHandler, notFound, debugRequest } = require('./middleware/errorHandler');
 const { apiLimiter } = require('./middleware/rateLimiter');
 const { requestLogger } = require('./middleware/logging');
 
@@ -24,6 +24,8 @@ const shippingRoutes = require('./routes/shippingRoutes');
 const shiprocketRoutes = require('./routes/shiprocketRoutes');
 const customizationRoutes = require('./routes/customizations');
 const adminRoutes = require('./routes/admin');
+const galleryRoutes = require('./routes/gallery');
+const couponRoutes = require('./routes/coupons');
 
 // Create Express app
 const app = express();
@@ -79,7 +81,9 @@ app.use(express.urlencoded({
 // Logging middleware
 app.use(requestLogger);
 
+// Debug middleware in development
 if (process.env.NODE_ENV === 'development') {
+    app.use(debugRequest);
     app.use(morgan('dev'));
 } else {
     app.use(morgan('combined'));
@@ -112,6 +116,8 @@ app.use('/api/shiprocket', shiprocketRoutes);
 app.use('/api/cart', require('./routes/cart'));
 app.use('/api/customizations', customizationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/gallery', galleryRoutes);
+app.use('/api/coupons', couponRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

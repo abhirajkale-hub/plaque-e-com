@@ -6,6 +6,28 @@ const errorHandler = (err, req, res, next) => {
     // Log error
     console.error('Error:', err.stack);
 
+    // JSON parsing error
+    if (err.type === 'entity.parse.failed' || err.message.includes('JSON')) {
+        return res.status(400).json({
+            success: false,
+            error: {
+                message: 'Invalid JSON format in request body',
+                code: 'INVALID_JSON'
+            }
+        });
+    }
+
+    // Body parser errors
+    if (err.status === 400 && err.body === undefined) {
+        return res.status(400).json({
+            success: false,
+            error: {
+                message: 'Invalid request body',
+                code: 'INVALID_REQUEST_BODY'
+            }
+        });
+    }
+
     // Mongoose bad ObjectId
     if (err.name === 'CastError') {
         const message = 'Resource not found';
@@ -96,8 +118,21 @@ const asyncHandler = (fn) => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
 };
 
+// Debug middleware for request logging
+const debugRequest = (req, res, next) => {
+    if (process.env.NODE_ENV === 'development') {
+        console.log(`${req.method} ${req.path}`, {
+            headers: req.headers,
+            body: req.body,
+            query: req.query
+        });
+    }
+    next();
+};
+
 module.exports = {
     errorHandler,
     notFound,
-    asyncHandler
+    asyncHandler,
+    debugRequest
 };

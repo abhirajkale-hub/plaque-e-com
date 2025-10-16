@@ -13,11 +13,13 @@ const createOrder = async (req, res) => {
         const {
             items,
             totalAmount,
+            couponInfo,
             shippingDetails
         } = req.body;
 
         console.log('Order Controller - Extracted items:', items);
         console.log('Order Controller - Total amount:', totalAmount);
+        console.log('Order Controller - Coupon info:', couponInfo);
 
         // Validate products and calculate total
         let calculatedTotal = 0;
@@ -120,8 +122,43 @@ const createOrder = async (req, res) => {
             });
         }
 
-        // Verify total amount
-        if (Math.abs(calculatedTotal - totalAmount) > 0.01) {
+        // Verify total amount (accounting for coupons)
+        let expectedTotal = calculatedTotal;
+        let discountAmount = 0;
+
+        if (couponInfo && couponInfo.discountAmount) {
+            // If coupon is applied, validate the discount
+            discountAmount = couponInfo.discountAmount;
+            expectedTotal = calculatedTotal - discountAmount;
+
+            console.log('Order Controller - Coupon validation:', {
+                originalTotal: calculatedTotal,
+                discountAmount: discountAmount,
+                expectedTotal: expectedTotal,
+                receivedTotal: totalAmount
+            });
+
+            // Verify the discount amount is reasonable (not more than original total)
+            if (discountAmount > calculatedTotal) {
+                return res.status(400).json({
+                    success: false,
+                    error: {
+                        message: 'Invalid discount amount',
+                        code: 'INVALID_DISCOUNT'
+                    }
+                });
+            }
+        }
+
+        if (Math.abs(expectedTotal - totalAmount) > 0.01) {
+            console.error('Order Controller - Total mismatch:', {
+                calculatedTotal,
+                discountAmount,
+                expectedTotal,
+                receivedTotal: totalAmount,
+                difference: Math.abs(expectedTotal - totalAmount)
+            });
+
             return res.status(400).json({
                 success: false,
                 error: {
@@ -167,7 +204,7 @@ const createOrder = async (req, res) => {
         console.log('Order Controller - Prepared order items:', JSON.stringify(orderItems, null, 2));
 
         // Create order
-        const order = await Order.create({
+        const orderData = {
             order_number: orderNumber,
             user_id: req.user._id,
             items: orderItems,
@@ -176,7 +213,17 @@ const createOrder = async (req, res) => {
             status: 'new',
             payment_status: 'pending',
             ...shippingData
-        });
+        };
+
+        // Add coupon information if applied
+        if (couponInfo) {
+            orderData.coupon_code = couponInfo.couponCode;
+            orderData.coupon_discount = couponInfo.discountAmount;
+        }
+
+        console.log('Order Controller - Creating order with data:', JSON.stringify(orderData, null, 2));
+
+        const order = await Order.create(orderData);
 
         // Populate user and product details
         await order.populate([

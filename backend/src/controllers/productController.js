@@ -924,6 +924,156 @@ const getProductEnumValues = async (req, res) => {
     }
 };
 
+// @desc    Set product as featured
+// @route   PATCH /api/products/admin/:id/featured
+// @access  Private/Admin
+const setFeaturedProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Check if product exists
+        const product = await Product.findById(id);
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                error: {
+                    message: 'Product not found',
+                    code: 'PRODUCT_NOT_FOUND'
+                }
+            });
+        }
+
+        // Check if product is active
+        if (!product.is_active || product.status !== 'active') {
+            return res.status(400).json({
+                success: false,
+                error: {
+                    message: 'Only active products can be featured',
+                    code: 'INACTIVE_PRODUCT'
+                }
+            });
+        }
+
+        // Set as featured (middleware will handle removing featured from others)
+        product.is_featured = true;
+        await product.save();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                id: product._id,
+                name: product.name,
+                is_featured: product.is_featured
+            },
+            message: 'Product set as featured successfully'
+        });
+
+    } catch (error) {
+        console.error('Error setting featured product:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                message: 'Failed to set featured product',
+                code: 'SET_FEATURED_ERROR'
+            }
+        });
+    }
+};
+
+// @desc    Remove featured status from product
+// @route   DELETE /api/products/admin/:id/featured
+// @access  Private/Admin
+const removeFeaturedProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Check if product exists
+        const product = await Product.findById(id);
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                error: {
+                    message: 'Product not found',
+                    code: 'PRODUCT_NOT_FOUND'
+                }
+            });
+        }
+
+        // Remove featured status
+        product.is_featured = false;
+        await product.save();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                id: product._id,
+                name: product.name,
+                is_featured: product.is_featured
+            },
+            message: 'Featured status removed successfully'
+        });
+
+    } catch (error) {
+        console.error('Error removing featured product:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                message: 'Failed to remove featured product',
+                code: 'REMOVE_FEATURED_ERROR'
+            }
+        });
+    }
+};
+
+// @desc    Get current featured product
+// @route   GET /api/products/featured
+// @access  Public
+const getFeaturedProduct = async (req, res) => {
+    try {
+        const featuredProduct = await Product.findOne({
+            is_featured: true,
+            is_active: true,
+            status: 'active',
+            deleted_at: null
+        });
+
+        if (!featuredProduct) {
+            return res.status(200).json({
+                success: true,
+                data: null,
+                message: 'No featured product found'
+            });
+        }
+
+        // Get variants for the featured product
+        const variants = await ProductVariant.find({
+            product_id: featuredProduct._id,
+            is_available: true
+        }).select('-__v');
+
+        const productWithVariants = {
+            ...featuredProduct.toJSON(),
+            product_variants: variants
+        };
+
+        res.status(200).json({
+            success: true,
+            data: productWithVariants,
+            message: 'Featured product retrieved successfully'
+        });
+
+    } catch (error) {
+        console.error('Error getting featured product:', error);
+        res.status(500).json({
+            success: false,
+            error: {
+                message: 'Failed to get featured product',
+                code: 'GET_FEATURED_ERROR'
+            }
+        });
+    }
+};
+
 module.exports = {
     getProducts,
     getProductBySlug,
@@ -937,5 +1087,8 @@ module.exports = {
     getCategories,
     checkProductAvailability,
     getProductsByCategory,
-    getProductEnumValues
+    getProductEnumValues,
+    setFeaturedProduct,
+    removeFeaturedProduct,
+    getFeaturedProduct
 };

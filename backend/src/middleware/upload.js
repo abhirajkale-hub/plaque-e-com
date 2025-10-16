@@ -6,8 +6,9 @@ const fs = require('fs');
 const uploadDir = path.join(__dirname, '../../uploads');
 const certificatesDir = path.join(uploadDir, 'certificates');
 const productsDir = path.join(uploadDir, 'products');
+const galleryDir = path.join(uploadDir, 'gallery');
 
-[uploadDir, certificatesDir, productsDir].forEach(dir => {
+[uploadDir, certificatesDir, productsDir, galleryDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
@@ -37,6 +38,19 @@ const productStorage = multer.diskStorage({
         const ext = path.extname(file.originalname);
         const name = file.originalname.replace(ext, '').replace(/[^a-zA-Z0-9]/g, '_');
         cb(null, `product_${uniqueSuffix}_${name}${ext}`);
+    }
+});
+
+// Storage configuration for gallery images
+const galleryStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, galleryDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        const name = file.originalname.replace(ext, '').replace(/[^a-zA-Z0-9]/g, '_');
+        cb(null, `gallery_${uniqueSuffix}_${name}${ext}`);
     }
 });
 
@@ -84,6 +98,15 @@ const uploadProductImage = multer({
     fileFilter: imageFileFilter
 }).array('images', 10); // Allow up to 10 images
 
+// Gallery image upload middleware
+const uploadGalleryImage = multer({
+    storage: galleryStorage,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+    fileFilter: imageFileFilter
+}).single('image'); // Single image upload for gallery
+
 // Error handling middleware for multer
 const handleUploadError = (err, req, res, next) => {
     if (err instanceof multer.MulterError) {
@@ -123,5 +146,6 @@ const handleUploadError = (err, req, res, next) => {
 module.exports = {
     uploadCertificate,
     uploadProductImage,
+    uploadGalleryImage,
     handleUploadError
 };
